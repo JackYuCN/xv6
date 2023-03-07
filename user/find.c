@@ -23,7 +23,7 @@ fmtname(char *path)
 }
 
 /**
- * @brief find -- mimic the implementation of Unix utility find
+ * @brief find -- a simple version of Unix find program
  * 
  * @param rootpath -- root path to search for
  * @param filename -- filename to be found
