@@ -21,6 +21,18 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
+uint64
+countproc(void)
+{
+  uint64 cnt = 0;
+
+  for (int i = 0; i < NPROC; i++) 
+    if (proc[i].state != UNUSED)
+      cnt++;
+  
+  return cnt;
+}
+
 // initialize the proc table at boot time.
 void
 procinit(void)
@@ -127,6 +139,8 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->tracemask = 0;
+
   return p;
 }
 
@@ -142,6 +156,7 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  p->tracemask = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -276,6 +291,7 @@ fork(void)
   np->sz = p->sz;
 
   np->parent = p;
+  np->tracemask = p->tracemask;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
