@@ -440,3 +440,40 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+/**
+ * @brief vmprintHelper -- helper function for vmprint
+ * 
+ * @param pagetable -- pagetable to be print
+ * @param depth -- pagetable depth, range from 1 to 3 
+ */
+void 
+vmprintHelper(pagetable_t pagetable, int depth)
+{
+  const char *indent = "..";
+ 
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      for (int j = 0; j < depth; j++) printf("%s", indent);
+      uint64 child = PTE2PA(pte);
+      printf("%d: pte %p pa %p\n", i, pte, child);
+      if (depth < 3)  // this PTE points to a lower-level page table.
+        vmprintHelper((pagetable_t)child, depth + 1);
+    }
+  }
+}
+
+/**
+ * @brief vmprint -- print the pagetable info
+ * 
+ * @param pagetable pagetable to be print
+ */
+void 
+vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable);
+  vmprintHelper(pagetable, 1);
+}
+
