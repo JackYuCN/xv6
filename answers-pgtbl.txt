@@ -1,3 +1,11 @@
 1. page 0 contains the text&data information; 
    page 2 contains the user stack; 
    user cannot read/write page 1 beacause its PTE_U flag is not set, actually it serves as the guard page of the user stack.
+
+2. prevent the overflow problem
+   example: 
+       p->sz = 10, srcva = 1(000...01), len = 2^64 - 1(111...11)
+       srcva < p->sz 
+       srcva + len = (000...00) < p->sz
+     but
+       srcva + len < srcva
