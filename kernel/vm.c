@@ -563,11 +563,7 @@ ukvmmap(pagetable_t upgtbl, pagetable_t kpgtbl, uint64 sz)
       panic("ukvmmap: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((flags & PTE_U) == 0) {
-      printf("pa %p flag %p\n", pa, flags);
-      panic("ukvmmap: PTE_U flag is not set");
-    }
-    if(mappages(kpgtbl, i, PGSIZE, pa, flags ^ PTE_U) != 0)
+    if(mappages(kpgtbl, i, PGSIZE, pa, flags & (~PTE_U)) != 0)
       goto err;
   }
   return 0;
