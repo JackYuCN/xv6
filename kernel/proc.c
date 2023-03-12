@@ -113,6 +113,14 @@ found:
     return 0;
   }
 
+  // create the per-process kernel page table
+  p->kpgtbl = ukvminit(p->kstack);
+  if (p->kpgtbl == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -141,7 +149,10 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  if (p->kpgtbl)
+    proc_ukvmfree(p->kpgtbl);
   p->pagetable = 0;
+  p->kpgtbl = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -473,7 +484,14 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        // change the satp reg to the chosen process kernel page table
+        proc_kvminithart(p->kpgtbl);
+
         swtch(&c->context, &p->context);
+
+        // Scheduler process uses the global kernel page table
+        kvminithart();
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -696,4 +714,25 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+/**
+ * @brief proc_ukvmfree -- free the process kernel page table without freeing the physical memory pages
+ * 
+ * @param kpgtbl -- process kernel page table
+ */
+void 
+proc_ukvmfree(pagetable_t kpgtbl) 
+{
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = kpgtbl[i];
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      proc_ukvmfree((pagetable_t)child);
+      kpgtbl[i] = 0;
+    }
+  }
+  kfree((void*)kpgtbl);
 }

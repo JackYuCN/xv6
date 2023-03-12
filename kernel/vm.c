@@ -458,7 +458,9 @@ vmprintHelper(pagetable_t pagetable, int depth)
     if(pte & PTE_V){
       for (int j = 0; j < depth; j++) printf("%s", indent);
       uint64 child = PTE2PA(pte);
-      printf("%d: pte %p pa %p\n", i, pte, child);
+      uint64 flag = PTE_FLAGS(pte);
+      printf("%d: pte %p pa %p flag %p\n", i, pte, child, flag);
+      // printf("%d: pte %p pa %p\n", i, pte, child);
       if (depth < 3)  // this PTE points to a lower-level page table.
         vmprintHelper((pagetable_t)child, depth + 1);
     }
@@ -477,3 +479,62 @@ vmprint(pagetable_t pagetable)
   vmprintHelper(pagetable, 1);
 }
 
+/**
+ * @brief ukvminit -- create the process kernel page table and do the mapping
+ * 
+ * @param kstack -- kernel stack va
+ * @return per-process kernel page table
+ */
+pagetable_t
+ukvminit(uint64 kstack)
+{
+  pagetable_t kpgtbl = (pagetable_t) kalloc();
+  memset(kpgtbl, 0, PGSIZE);
+
+  // uart registers
+  if(mappages(kpgtbl, UART0, PGSIZE, UART0, PTE_R | PTE_W) != 0)
+    panic("ukvmmap");
+
+  // virtio mmio disk interface
+  if(mappages(kpgtbl, VIRTIO0, PGSIZE, VIRTIO0, PTE_R | PTE_W) != 0)
+    panic("ukvmmap");
+
+  // CLINT
+  if(mappages(kpgtbl, CLINT, 0x10000, CLINT, PTE_R | PTE_W) != 0)
+    panic("ukvmmap");
+  
+  // PLIC
+  if(mappages(kpgtbl, PLIC, 0x400000, PLIC, PTE_R | PTE_W) != 0)
+    panic("ukvmmap");
+
+  // map kernel text executable and read-only.
+  if(mappages(kpgtbl, KERNBASE, (uint64)etext-KERNBASE, KERNBASE, PTE_R | PTE_X) != 0)
+    panic("ukvmmap");
+
+  // map kernel data and the physical RAM we'll make use of.
+  if(mappages(kpgtbl, (uint64)etext, PHYSTOP-(uint64)etext, (uint64)etext, PTE_R | PTE_W) != 0)
+    panic("ukvmmap");
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  if(mappages(kpgtbl, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X) != 0)
+    panic("ukvmmap");
+  
+  // kernel stack
+  if(mappages(kpgtbl, kstack, PGSIZE, kvmpa(kstack), PTE_R | PTE_W) != 0)
+    panic("ukvmmap");
+
+  return kpgtbl;
+}
+
+/**
+ * @brief proc_kvminithart -- change the satp reg to the chosen process kernel page table
+ * 
+ * @param kpgtbl -- process kernel page table
+ */
+void
+proc_kvminithart(pagetable_t kpgtbl)
+{
+  w_satp(MAKE_SATP(kpgtbl));
+  sfence_vma();
+}
