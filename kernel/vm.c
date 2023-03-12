@@ -538,3 +538,58 @@ proc_kvminithart(pagetable_t kpgtbl)
   w_satp(MAKE_SATP(kpgtbl));
   sfence_vma();
 }
+
+/**
+ * @brief ukvmmap -- map user memory into process kernel page table
+ * 
+ * @param upgtbl -- user page table
+ * @param kpgtbl -- kernel page table
+ * @param sz -- map size
+ * @return 0 for success, -1 for failure
+ */
+int 
+ukvmmap(pagetable_t upgtbl, pagetable_t kpgtbl, uint64 sz)
+{
+  pte_t *pte;
+  uint64 pa, i;
+  uint flags;
+
+  if (sz > PLIC) panic("ukvmmap: user addr over PLIC");
+
+  for(i = 0; i < sz; i += PGSIZE){
+    if((pte = walk(upgtbl, i, 0)) == 0)
+      panic("ukvmmap: pte should exist");
+    if((*pte & PTE_V) == 0)
+      panic("ukvmmap: page not present");
+    pa = PTE2PA(*pte);
+    flags = PTE_FLAGS(*pte);
+    if((flags & PTE_U) == 0) {
+      printf("pa %p flag %p\n", pa, flags);
+      panic("ukvmmap: PTE_U flag is not set");
+    }
+    if(mappages(kpgtbl, i, PGSIZE, pa, flags ^ PTE_U) != 0)
+      goto err;
+  }
+  return 0;
+
+ err:
+  uvmunmap(kpgtbl, 0, i / PGSIZE, 0);
+  return -1;
+}
+
+void
+ukvmunmap(pagetable_t pagetable, uint64 sz)
+{
+  uint64 a;
+  pte_t *pte;
+
+  for(a = 0; a < sz; a += PGSIZE){
+    if((pte = walk(pagetable, a, 0)) == 0)
+      panic("ukvmunmap: walk");
+    if((*pte & PTE_V) == 0)
+      panic("ukvmunmap: not mapped");
+    if(PTE_FLAGS(*pte) == PTE_V)
+      panic("ukvmunmap: not a leaf");
+    *pte = 0;
+  }
+}

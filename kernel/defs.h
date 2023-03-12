@@ -109,6 +109,7 @@ int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            proc_ukvmfree(pagetable_t);
+void            ukvmunmap(pagetable_t, uint64);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -182,6 +183,7 @@ int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t);
 pagetable_t     ukvminit(uint64);
 void            proc_kvminithart(pagetable_t);
+int             ukvmmap(pagetable_t, pagetable_t, uint64);
 
 // plic.c
 void            plicinit(void);
