@@ -118,6 +118,7 @@ void
 panic(char *s)
 {
   pr.locking = 0;
+  backtrace();
   printf("panic: ");
   printf(s);
   printf("\n");
@@ -131,4 +132,27 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+/**
+ * @brief backtrace -- a list of the function calls on the stack above the point at which the error occurred
+ * 
+ */
+void
+backtrace()
+{
+  uint64 fp, ra, upbound, downbound;
+
+  fp = r_fp();
+  upbound = PGROUNDUP(fp);
+  downbound = PGROUNDDOWN(fp);
+
+  while (1) {
+    ra = (uint64)(*(uint64 *)(fp - 8));
+    fp = (uint64)(*(uint64 *)(fp - 16));
+    if (fp && fp >= downbound + 16 && fp <= upbound)
+      printf("%p\n", ra);
+    else
+      break;
+  }
 }
