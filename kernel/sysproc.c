@@ -97,3 +97,43 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+/**
+ * @brief sys_sigalarm -- load interval and handler into proc
+ * 
+ * @return 0 is success, -1 is failure
+ */
+uint64
+sys_sigalarm(void)
+{
+  int n;
+  uint64 addr;
+
+  if(argint(0, &n) < 0 || argaddr(1, &addr) < 0)
+    return -1;
+
+  struct proc *p = myproc();
+  p->interval = n;
+  p->handler = addr;
+
+  return 0;
+}
+
+/**
+ * @brief sys_sigreturn -- syscall that allow handler to return to interrupted usercode
+ * 
+ * @return 0 is success, -1 is failure
+ */
+uint64
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  
+  // allow sigreturn
+  p->handle_alarm = 0;
+
+  // restore regs
+  memmove(p->trapframe, &p->regs, sizeof(p->regs));
+  
+  return 0;
+}

@@ -77,9 +77,28 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+  if(which_dev == 2) {
+    if (p->interval > 0) {
+      p->tickpassed++;
+      if (p->tickpassed >= p->interval && p->handle_alarm == 0) {
+        p->tickpassed = 0;
 
+        // forbid handler when handler processing
+        p->handle_alarm = 1;
+
+        // save the trapframe into regs
+        memmove(&p->regs, p->trapframe, sizeof(p->regs));
+        
+        // set the return addr to handler func
+        p->trapframe->epc = p->handler;
+
+        goto ret;
+      }
+    }
+    yield();
+  }
+
+ret:
   usertrapret();
 }
 
@@ -217,4 +236,3 @@ devintr()
     return 0;
   }
 }
-
